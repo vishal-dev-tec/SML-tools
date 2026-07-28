@@ -1,0 +1,136 @@
+================================================================
+SML SCANNER - FULL SETUP & USAGE CHEATSHEET
+================================================================
+Run these top to bottom, in order, on your Kali box.
+Copy-paste each block as-is.
+
+----------------------------------------------------------------
+STEP 1 - SYSTEM PACKAGES (apt)
+----------------------------------------------------------------
+sudo apt update
+sudo apt install -y nmap masscan whois dnsutils nikto sslscan \
+    enum4linux snmp whatweb dnsrecon gobuster wpscan testssl.sh \
+    seclists curl python3-pip golang-go unzip
+
+----------------------------------------------------------------
+STEP 2 - PYTHON DEPENDENCY (report generation)
+----------------------------------------------------------------
+python3 -m pip install reportlab --break-system-packages
+
+----------------------------------------------------------------
+STEP 3 - GO-BASED TOOLS (not in apt on Kali, install via go)
+----------------------------------------------------------------
+go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install github.com/projectdiscovery/katana/cmd/katana@latest
+go install github.com/ffuf/ffuf/v2@latest
+go install github.com/lc/gau/v2/cmd/gau@latest
+
+echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.zshrc
+source ~/.zshrc
+
+----------------------------------------------------------------
+STEP 4 - theHarvester / amass (if not already on Kali by default)
+----------------------------------------------------------------
+which theHarvester amass
+# If missing:
+sudo apt install -y theharvester amass
+
+----------------------------------------------------------------
+STEP 5 - nuclei needs its vulnerability template database
+----------------------------------------------------------------
+nuclei -update-templates
+
+----------------------------------------------------------------
+STEP 6 - VERIFY EVERYTHING IS INSTALLED (run this before scanning)
+----------------------------------------------------------------
+which nmap masscan whois dig dnsrecon theHarvester amass \
+    whatweb nikto gobuster ffuf wpscan httpx katana gau \
+    sslscan testssl.sh enum4linux snmpwalk nuclei curl
+
+ls /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+
+# Every line above should print a path, not "not found".
+# Any tool that's missing will show as "Skipped (not installed)"
+# in the PDF report — not an error, just an incomplete section.
+
+================================================================
+USAGE - EXAMPLE COMMANDS
+================================================================
+Run all commands from inside the sml_scanner_ver1.1/ folder
+(the one containing README.md, requirements.txt, and sml/).
+
+----------------------------------------------------------------
+FULL SUITE - all 22 tools, full depth (20-40+ min)
+----------------------------------------------------------------
+python3 -m sml.scanner https://target.tld -y
+
+----------------------------------------------------------------
+QUICK SANITY CHECK - fast, ~1 min, confirms pipeline works
+----------------------------------------------------------------
+python3 -m sml.scanner https://scanme.nmap.org -y -t whois,dig,httpx
+
+----------------------------------------------------------------
+NETWORK/PORT SCAN ONLY (IP or host, no web app tools)
+----------------------------------------------------------------
+python3 -m sml.scanner 192.168.56.10 -y -t nmap_tcp,nmap_udp,masscan
+
+----------------------------------------------------------------
+WEB APP SCAN ONLY (full site assessment)
+----------------------------------------------------------------
+python3 -m sml.scanner https://target.tld -y -t httpx,katana,gau,whatweb,nikto,gobuster,ffuf,nuclei,wpscan
+
+----------------------------------------------------------------
+TLS/SSL AUDIT ONLY
+----------------------------------------------------------------
+python3 -m sml.scanner target.tld -y -t sslscan,testssl
+
+----------------------------------------------------------------
+DNS/OSINT RECON ONLY (fully passive, no traffic hits the target)
+----------------------------------------------------------------
+python3 -m sml.scanner target.tld -y -t whois,dig,dnsrecon,theharvester,amass,gau
+
+----------------------------------------------------------------
+WEB3 / EXPOSED RPC NODE CHECK
+----------------------------------------------------------------
+python3 -m sml.scanner target.tld -y -t web3_rpc_probe
+
+----------------------------------------------------------------
+INTERNAL NETWORK SERVICE ENUM (SMB/SNMP - internal lab hosts)
+----------------------------------------------------------------
+python3 -m sml.scanner 192.168.56.10 -y -t enum4linux,snmpwalk
+
+----------------------------------------------------------------
+LOWER CONCURRENCY (constrained hardware / avoid hammering target)
+----------------------------------------------------------------
+python3 -m sml.scanner target.tld -y -w 2
+
+----------------------------------------------------------------
+CUSTOM OUTPUT LOCATION + OPERATOR NAME ON REPORT
+----------------------------------------------------------------
+python3 -m sml.scanner target.tld -y -o ./reports/run1 --operator "ED"
+
+----------------------------------------------------------------
+SEE ALL AVAILABLE TOOL KEYS
+----------------------------------------------------------------
+python3 -m sml.scanner --help
+
+================================================================
+WHERE OUTPUT GOES
+================================================================
+sml_reports/<target>_<timestamp>/
+    sml_report_<target>_<timestamp>.pdf   <- the report, open this
+    raw_logs/<toolname>.log                <- full untruncated output per tool
+
+Open the PDF:
+    xdg-open sml_reports/.../sml_report_*.pdf
+    (or: evince / zathura / firefox <path>.pdf if xdg-open has no default app)
+
+================================================================
+REMINDER
+================================================================
+Only run the active scan tools (nmap, nikto, gobuster, ffuf,
+nuclei, wpscan) against a target you own or have explicit
+written authorization to test. Passive-only tools (whois, dig,
+dnsrecon, theHarvester, amass, gau) don't send traffic to the
+target itself and carry far less risk either way.
